@@ -8,7 +8,7 @@ import sys
 import logging
 
 
-def _append_run_path():
+def _append_run_path():         #чтоб не матюкалось про PATH при pyinstaller
     if getattr(sys, 'frozen', False):
         pathlist = []
 
@@ -25,8 +25,6 @@ def _append_run_path():
         os.environ["PATH"] += os.pathsep + os.pathsep.join(pathlist)
 
     logging.error("current PATH: %s", os.environ['PATH'])
-
-
 _append_run_path()
 
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -38,7 +36,10 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.setFixedSize(300, 335)
         self.pushButton.clicked.connect(self.button_clicked)
+        self.lineEdit.returnPressed.connect(self.button_clicked)
+        self.lineEdit_3.setEchoMode(self.lineEdit_3.Password)
         self.mutex = threading.Lock()
         thread = threading.Thread(target=self.update_messages)
         thread.start()
@@ -73,7 +74,6 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
                     beauty_time = beauty_time.strftime('%d/%m/%Y %H:%M:%S')
                     self.add_to_chat(message["username"] + ' ' + beauty_time)
                     self.add_to_chat(message["text"] + '\n')
-
                     last_time = message["time"]
             except:
                 self.add_to_chat('Произошла ошибка при получении сообщений\n')
@@ -82,13 +82,15 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
     def button_clicked(self):
         try:
             self.send_message(
-                self.plainTextEdit.toPlainText(),
-                self.plainTextEdit_2.toPlainText(),
-                self.textEdit.toPlainText(),
+                self.lineEdit_2.text(),
+                self.lineEdit_3.text(),
+                self.lineEdit.text()
             )
+            time.sleep(1)
+            self.textBrowser.moveCursor(QtGui.QTextCursor.End)
         except:
             self.add_to_chat('Произошла ошибка отправки\n')
-        self.textEdit.clear()
+        self.lineEdit.clear()
 
     def add_to_chat(self, text):
         self.mutex.acquire()
