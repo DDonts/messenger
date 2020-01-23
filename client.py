@@ -2,7 +2,6 @@ import requests
 from datetime import datetime
 import time
 import threading
-
 import os
 import sys
 import logging
@@ -41,8 +40,8 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
         self.lineEdit.returnPressed.connect(self.button_clicked)
         self.lineEdit_3.setEchoMode(self.lineEdit_3.Password)
         self.mutex = threading.Lock()
-        thread = threading.Thread(target=self.update_messages)
-        thread.start()
+        self.thread = threading.Thread(target=self.update_messages)
+        self.thread.start()
         self.ip = '192.168.1.103'
 
     def send_message(self, username, password, text):
@@ -78,6 +77,8 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
             except:
                 self.add_to_chat('Произошла ошибка при получении сообщений\n')
             time.sleep(1)
+            if app.aboutToQuit:
+                break
 
     def button_clicked(self):
         try:
@@ -101,6 +102,7 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
 
 
 app = QtWidgets.QApplication([])
+
 window = MessengerApp()
 window.show()
 app.exec_()
