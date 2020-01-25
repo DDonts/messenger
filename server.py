@@ -1,18 +1,12 @@
 from flask import Flask, request
 from datetime import datetime, timedelta
 import time
-
+import ast
+from collections import OrderedDict
 app = Flask(__name__)
 
-
-messages = [
-    # {"username": "Jack", "text": "Hello!", "time": time.time()},
-    # {"username": "Sam", "text": "Kill, all humans!", "time": time.time()},
-]
-users = {
-    # "Jack": '12345',
-    # "Mary": '54321',
-}
+# messages = []
+users = {}
 
 
 @app.route("/")
@@ -24,8 +18,16 @@ def hello():
 def status():
     now = datetime.now() + timedelta(hours=3)
     now = now.strftime('%d/%m/%Y %H:%M:%S')
-    users_num = len(users)
-    mess_num = len(messages)
+    f = open('userbase.txt')
+    users_num = 0
+    for i in f:
+        users_num += 1
+    f.close()
+    f = open('textbase.txt')
+    mess_num = 0
+    for i in f:
+        mess_num += 1
+    f.close()
     result = f'''
 <p>Status: {True}
 <p>Server time: {str(now)} GTM
@@ -46,7 +48,14 @@ def messages_view():
     }
     """
     after = float(request.args['after'])
-    new_messages = [message for message in messages if message['time'] > after]
+    text_open = open('textbase.txt', 'r')
+    new_messages = []
+    try:
+        for message in text_open:
+            if float(ast.literal_eval(message)['time']) > after:
+                new_messages.append(message)
+    except SyntaxError:
+        pass
     return {'messages': new_messages}
 
 
@@ -64,12 +73,15 @@ def send_view():
     data = request.json
     username = data["username"]
     password = data["password"]
-    if username not in users or users[username] != password:
-        return {"ok": False}
+
+    # if username not in users or users[username] != password:
+    #     return {"ok": False}
 
     text = data["text"]
-    messages.append({"username": username, "text": text, "time": time.time()})
-
+    text_file = open('textbase.txt', 'a')
+    tmp_str = '{' + f'"user" : "{username}", "text" : "{text}", "time" : "{time.time()}"' + '}'
+    text_file.write(str(tmp_str) + '\n')
+    text_file.close()
     return {'ok': True}
 
 
@@ -83,17 +95,30 @@ def auth_view():
     }
     output: {"ok": bool}
     """
+
     data = request.json
     username = data["username"]
     password = data["password"]
-
-    if username not in users:
-        users[username] = password
+    checking = False
+    userfile = open('userbase.txt')
+    for i in userfile:
+        check = i.find(':')
+        userstr = i[:check]
+        passstr = i[check+1:-1]
+        if username != userstr:
+            pass
+        else:
+            checking = True
+            break
+    userfile.close()
+    if not checking:
+        userfile = open('userbase.txt', 'a')
+        userfile.write(username + ':' + password + '\n')
+        userfile.close()
         return {"ok": True}
-    elif users[username] == password:
+    elif passstr == password:
         return {"ok": True}
     else:
         return {"ok": False}
 
-
-app.run()
+app.run(host='192.168.1.103')
