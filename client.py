@@ -5,9 +5,10 @@ import threading
 import os
 import sys
 import logging
-
-
-def _append_run_path():         #чтоб не матюкалось про PATH при pyinstaller
+import ast
+import json
+import re
+def _append_run_path():  # чтоб не матюкалось про PATH при pyinstaller
     if getattr(sys, 'frozen', False):
         pathlist = []
 
@@ -24,9 +25,13 @@ def _append_run_path():         #чтоб не матюкалось про PATH 
         os.environ["PATH"] += os.pathsep + os.pathsep.join(pathlist)
 
     logging.error("current PATH: %s", os.environ['PATH'])
+
+
 _append_run_path()
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 import my_interface
 
 
@@ -43,14 +48,16 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
         self.thread = threading.Thread(target=self.update_messages)
         self.thread.start()
         self.ip = '192.168.1.103'
+        self.vklucheno = True
+        self.setWindowIcon(QIcon('icon.ico'))
 
     def send_message(self, username, password, text):
         response = requests.post(
-            f'http://samsapiel.pythonanywhere.com/auth',
+            'http://samsapiel.pythonanywhere.com/auth',
             json={"username": username, "password": password}
         )
         if not response.json()['ok']:
-            self.add_to_chat('Сообщение не отправлено\n')
+            self.add_to_chat('Сообщение не отправлено/auth \n')
             return
 
         response = requests.post(
@@ -58,7 +65,7 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
             json={"username": username, "password": password, "text": text}
         )
         if not response.json()['ok']:
-            self.add_to_chat('Сообщение не отправлено\n')
+            self.add_to_chat('Сообщение не отправлено/send \n')
 
     def update_messages(self):
         last_time = 0
@@ -66,31 +73,39 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
             try:
                 response = requests.get('http://samsapiel.pythonanywhere.com/messages',
                                         params={'after': last_time})
-                messages = (response.json())["messages"]
-
-                for message in messages:
-                    beauty_time = datetime.fromtimestamp(message["time"])
-                    beauty_time = beauty_time.strftime('%d/%m/%Y %H:%M:%S')
-                    self.add_to_chat(message["username"] + ' ' + beauty_time)
-                    self.add_to_chat(message["text"] + '\n')
-                    last_time = message["time"]
+                json_data = json.loads(response.text)['messages']
+                for message in json_data:
+                    beauty_time = datetime.fromtimestamp(float(ast.literal_eval(message)["time"])).strftime('%d/%m/%Y %H:%M:%S')
+                    self.add_to_chat(ast.literal_eval(message)["user"] + ' ' + beauty_time)
+                    self.add_to_chat(ast.literal_eval(message)["text"] + '\n')
+                    last_time = ast.literal_eval(message)["time"]
             except:
                 self.add_to_chat('Произошла ошибка при получении сообщений\n')
             time.sleep(1)
-            if app.aboutToQuit:
+            if not self.vklucheno:
                 break
 
+    def closeEvent(self, event):
+        self.vklucheno = False
+
     def button_clicked(self):
-        try:
-            self.send_message(
-                self.lineEdit_2.text(),
-                self.lineEdit_3.text(),
-                self.lineEdit.text()
-            )
-            time.sleep(1)
-            self.textBrowser.moveCursor(QtGui.QTextCursor.End)
-        except:
-            self.add_to_chat('Произошла ошибка отправки\n')
+        regex = r"[:]"
+        if re.match(regex, self.lineEdit_3.text()):
+            self.add_to_chat('Пароль содержит запрещённые символы\n')
+        elif self.lineEdit_2.text() and self.lineEdit_3.text():
+            try:
+                self.send_message(
+                    self.lineEdit_2.text(),
+                    self.lineEdit_3.text(),
+                    self.lineEdit.text()
+                )
+                time.sleep(1)
+                self.textBrowser.moveCursor(QTextCursor.End)  # QtGui
+            except:
+                self.add_to_chat('Произошла ошибка отправки\n')
+        else:
+            self.add_to_chat('Введите имя пользователя и пароль\n')
+
         self.lineEdit.clear()
 
     def add_to_chat(self, text):
@@ -99,12 +114,8 @@ class MessengerApp(QtWidgets.QMainWindow, my_interface.Ui_MainWindow):
         self.mutex.release()
 
 
-
-
-app = QtWidgets.QApplication([])
-
+app = QtWidgets.QApplication(sys.argv)
 window = MessengerApp()
 window.show()
 app.exec_()
-
-raise SystemExit()
+window.thread.join()
